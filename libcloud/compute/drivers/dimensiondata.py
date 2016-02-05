@@ -929,9 +929,13 @@ class DimensionDataNodeDriver(NodeDriver):
             'server/server/%s' % id).object
         return self._to_node(node)
 
-    def ex_list_firewall_rules(self, network_domain):
-        params = {}
-        params['networkDomainId'] = network_domain.id
+    def ex_list_firewall_rules(self, network_domain, page_size=50,
+                               page_number=1):
+        params = {'pageSize': page_size, 'pageNumber': page_number}
+        if isinstance(network_domain, str):
+            params['networkDomainId'] = network_domain
+        else:
+            params['networkDomainId'] = network_domain.id
 
         response = self.connection \
             .request_with_orgId_api_2('network/firewallRule',
@@ -952,7 +956,7 @@ class DimensionDataNodeDriver(NodeDriver):
             source_ip.set('address', 'ANY')
         else:
             source_ip.set('address', rule.source.ip_address)
-            source_ip.set('prefixSize', rule.source.ip_prefix_size)
+            source_ip.set('prefixSize', str(rule.source.ip_prefix_size))
             if rule.source.port_begin is not None:
                 source_port = ET.SubElement(source, 'port')
                 source_port.set('begin', rule.source.port_begin)
@@ -965,7 +969,8 @@ class DimensionDataNodeDriver(NodeDriver):
             dest_ip.set('address', 'ANY')
         else:
             dest_ip.set('address', rule.destination.ip_address)
-            dest_ip.set('prefixSize', rule.destination.ip_prefix_size)
+            if rule.destination.ip_prefix_size is not None:
+                dest_ip.set('prefixSize', rule.destination.ip_prefix_size)
             if rule.destination.port_begin is not None:
                 dest_port = ET.SubElement(dest, 'port')
                 dest_port.set('begin', rule.destination.port_begin)
@@ -1689,6 +1694,12 @@ class DimensionDataNodeDriver(NodeDriver):
             .get('privateIpv4') \
             if has_network_info else \
             element.find(fixxpath('nic', TYPES_URN)).get('privateIpv4')
+
+        extra['ipv6'] = element.find(
+            fixxpath('networkInfo/primaryNic', TYPES_URN)) \
+            .get('ipv6') \
+            if has_network_info else \
+            element.find(fixxpath('nic', TYPES_URN)).get('ipv6')
 
         n = Node(id=element.get('id'),
                  name=findtext(element, 'name', TYPES_URN),
